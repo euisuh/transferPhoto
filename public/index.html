@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#142820">
+  <title>QR Photo Transfer</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <main>
+    <header><p class="eyebrow">SCREEN → CAMERA → PHOTO</p><h1>QR Photo Transfer</h1>
+      <p>Image bytes travel through QR frames. No photo uploads, Wi-Fi transfer, or download links.</p>
+      <p id="offline" role="status">Preparing offline scanner…</p>
+    </header>
+    <nav aria-label="Transfer mode"><button id="send-tab" aria-pressed="true">Send from computer</button><button id="receive-tab" aria-pressed="false">Receive on phone</button></nav>
+    <section id="sender" aria-label="Send photos">
+      <h2>1. Choose compressed JPEGs</h2>
+      <div class="inputs"><label>Photos <input id="photos" type="file" accept="image/jpeg,.jpg,.jpeg" multiple></label>
+      <label>Nested folder <input id="folder" type="file" webkitdirectory multiple></label></div>
+      <label>Photo <select id="queue" disabled><option>Choose photos first</option></select></label>
+      <p id="send-status" role="status">Run compress.py first. Start with one small photo.</p>
+      <div class="controls"><label>Frames/sec <input id="fps" type="number" min="1" max="10" value="3"></label>
+        <button id="play" disabled>Play QR loop</button><button id="previous" disabled>Previous frame</button><button id="next" disabled>Next frame</button>
+      </div>
+      <canvas id="qr" aria-label="Animated photo QR code" width="600" height="600"></canvas>
+      <p id="frame-status" role="status">QR appears here.</p>
+      <p>Keep the entire square visible. Missing frames arrive on the next loop. Pause or reduce speed if scanning stalls.</p>
+    </section>
+    <section id="receiver" hidden aria-label="Receive photo">
+      <h2>2. Point camera at computer</h2>
+      <p>Open this page over trusted HTTPS first. Wait for “Offline ready”, then enable airplane mode to test QR-only transfer. Keep this page open.</p>
+      <div class="controls"><button id="camera">Start camera</button><button id="reset">Reset / next photo</button></div>
+      <video id="video" playsinline muted hidden aria-label="Camera preview"></video>
+      <progress id="progress" value="0" max="1" aria-label="Received QR frames"></progress>
+      <p id="receive-status" role="status">Ready for a photo.</p>
+      <img id="preview" hidden alt="Received photo preview">
+      <a id="save" hidden download>Save JPEG</a>
+      <p>All frames must arrive. SHA-256 verifies the reconstructed image before saving. Save each photo before resetting. Folder paths appear in the status; downloads save one JPEG at a time.</p>
+    </section>
+  </main>
+</body>
+</html>

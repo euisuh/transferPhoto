@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+"""Offline Windows photo sender. Copy only transfer_photos.py to the internal PC.
+
+Requires standard Python 3.8+, FFmpeg and a modern Chrome/Edge browser.
+Embeds the unmodified Decimen v0.5.3 sender (AGPL-3.0-or-later).
+Source: https://github.com/bashalarmistalt/decimen-optical-transfer/tree/v0.5.3
+"""
+import argparse
+import base64
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+import webbrowser
+import zipfile
+import zlib
+
+# Generated from compress.py by tools/build_portable.py.
+# @COMPRESSOR@
+
+# Release assets and license notices; no download occurs on the internal PC.
+BUNDLED_ASSETS = "@ASSETS@"
+SENDER_SHA256 = "b3c1445849dcde2c8f0562de55b9ea9f8966a1eb37c04abdedf05da5ffb8efde"
+BATCH_BYTES = 32 * 1024 * 1024
+
+
+def unpack_sender(output):
+    assets = json.loads(zlib.decompress(base64.b85decode(BUNDLED_ASSETS)).decode("utf-8"))
+    sender = assets["sender.html"].encode("utf-8")
+    if hashlib.sha256(sender).hexdigest() != SENDER_SHA256:
+        raise ValueError("Bundled sender failed its checksum")
+    for name, content in assets.items():
+        with (output / name).open("x", encoding="utf-8", newline="") as handle:
+            handle.write(content)
+    return output / "sender.html"
+
+
+def make_batches(photos, output, limit=BATCH_BYTES):
+    batches, current, size = [], [], 22
+    for photo in photos:
+        # ZIP_STORED size: file bytes + local/central headers + UTF-8 names.
+        entry_size = photo.stat().st_size + 76 + 2 * len(photo.name.encode("utf-8"))
+        if entry_size + 22 > limit:
+            raise ValueError("Photo exceeds batch limit: " + photo.name)
+        if current and size + entry_size > limit:
+            batches.append(current)
+            current, size = [], 22
+        current.append(photo)
+        size += entry_size
+    if current:
+        batches.append(current)
+    archives = []
+    for index, batch in enumerate(batches, 1):
+        archive = output / ("photos-%03d.zip" % index)
+        with archive.open("xb") as handle:
+            with zipfile.ZipFile(handle, "w", compression=zipfile.ZIP_STORED) as bundle:
+                for photo in batch:
+                    bundle.write(photo, arcname=photo.name)
+        if archive.stat().st_size > limit:
+            archive.unlink()
+            raise ValueError("ZIP exceeded batch limit")
+        archives.append(archive)
+    return archives
+
+
+def prepare(source, output=None, edge=2048, quality=3, ffmpeg="ffmpeg"):
+    source = Path(source).resolve()
+    if not source.is_dir():
+        raise ValueError("Image folder does not exist: " + str(source))
+    if not 16 <= edge <= 32768 or not 1 <= quality <= 31:
+        raise ValueError("Use edge 16-32768 and quality 1-31")
+    executable = shutil.which(ffmpeg)
+    if not executable:
+        raise ValueError("FFmpeg not found. Add it to PATH or use --ffmpeg C:\\path\\ffmpeg.exe")
+    photos = sorted(photo for photo in source.iterdir()
+                    if photo.is_file() and not photo.is_symlink() and photo.suffix.lower() in EXTENSIONS)
+    if not photos:
+        raise ValueError("No supported images in folder (subfolders are not scanned)")
+    if output is None:
+        output = Path(tempfile.mkdtemp(prefix="qr-photos-", dir=str(source.parent)))
+    else:
+        output = Path(output).resolve()
+        if output == source or output in source.parents:
+            raise ValueError("Output cannot be the input folder or its parent")
+        output.mkdir(parents=True, exist_ok=False)
+    sender = unpack_sender(output)
+    converted, failures = [], []
+    print("Output: " + str(output), flush=True)
+    for index, photo in enumerate(photos, 1):
+        destination = output / "jpeg" / (photo.name + ".jpg")
+        try:
+            size = compress(photo, destination, edge, quality, MAX_BYTES, executable)
+            converted.append(destination)
+            print("[%d/%d] %s: %s -> %s bytes" % (index, len(photos), photo.name,
+                  format(photo.stat().st_size, ","), format(size, ",")), flush=True)
+        except (OSError, ValueError, subprocess.CalledProcessError) as error:
+            detail = error.stderr.decode(errors="replace") if isinstance(error, subprocess.CalledProcessError) else str(error)
+            failures.append(photo.name + ": " + detail)
+            print("FAILED " + photo.name + ": " + detail, flush=True)
+    if failures:
+        (output / "errors.txt").write_text("\n".join(failures), encoding="utf-8")
+    archives = make_batches(converted, output)
+    if not archives:
+        raise ValueError("All images failed. See " + str(output / "errors.txt"))
+    steps = [
+        "PHONE: Open https://decimen.app/receive/ in Chrome before going offline.",
+        "Install/cache the app, then use airplane mode with Wi-Fi off.",
+        "PC: Open sender.html in Chrome/Edge. Select one ZIP below.",
+        "QR starts when the file is selected. Click QR for fullscreen.",
+        "PHONE: Start camera, receive, Save; then PC selects the next ZIP.",
+        "PHONE: Extract saved ZIPs to get JPEGs. Keep both screens awake.",
+        "If scanning stalls: sender Transfer settings -> 1465 bytes/frame, 24 fps.",
+        "No photos are uploaded. QR is unencrypted; visible to other cameras.",
+        "JPEGs below 10,000,000 bytes; ZIPs at most 32 MiB. Originals unchanged.",
+        "Prepared %d photos; %d failed; %d ZIP batch(es)." % (len(converted), len(failures), len(archives)),
+        "", "ZIPs to send:",
+    ] + [str(archive) for archive in archives]
+    (output / "TRANSFER-STEPS.txt").write_text("\n".join(steps), encoding="utf-8")
+    print("\n" + "\n".join(steps), flush=True)
+    return sender, archives, failures
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Compress one photo folder and open an offline Decimen QR sender.")
+    parser.add_argument("folder", nargs="?", type=Path, help="Folder containing all images")
+    parser.add_argument("--output", type=Path, help="New output folder; never overwrite an existing folder")
+    parser.add_argument("--edge", type=int, default=2048, help="Maximum long edge; never upscale")
+    parser.add_argument("--quality", type=int, default=3, help="FFmpeg JPEG quality, 1 best, 31 lowest")
+    parser.add_argument("--ffmpeg", default="ffmpeg", help="FFmpeg command or full path to ffmpeg.exe")
+    parser.add_argument("--no-open", action="store_true", help="Prepare files without opening a browser")
+    args = parser.parse_args()
+    try:
+        if args.folder is None:
+            entered = input("Image folder: ").strip().strip('"')
+            if not entered:
+                raise ValueError("Enter an image folder path")
+            folder = Path(entered)
+        else:
+            folder = args.folder
+        sender, _, failures = prepare(folder, args.output, args.edge, args.quality, args.ffmpeg)
+        if not args.no_open:
+            if not webbrowser.open(sender.as_uri()):
+                print("Open this file in Chrome/Edge: " + str(sender))
+    except (OSError, ValueError, EOFError) as error:
+        parser.exit(1, str(error) + "\n")
+    raise SystemExit(1 if failures else 0)
+
+
+if __name__ == "__main__":
+    main()

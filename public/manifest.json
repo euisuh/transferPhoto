@@ -1,0 +1,8 @@
+{
+  "name": "QR Photo Transfer",
+  "short_name": "QR Photos",
+  "start_url": "./index.html#receive",
+  "display": "standalone",
+  "background_color": "#edf1ed",
+  "theme_color": "#142820"
+}

@@ -1,0 +1,3 @@
+0a800d518372a5c7a8850d1344b6dbef828f1f7de59658cdd76e3d31fe5895f5  ./decimen-v0.5.3-receiver.html
+b3c1445849dcde2c8f0562de55b9ea9f8966a1eb37c04abdedf05da5ffb8efde  ./decimen-v0.5.3-sender.html
+9bfe88ab0fb44da60d3ee1c050de0d00ad517d2b4c94bad6de64df8b5c48cd37  ./decimen-v0.5.3-site.zip

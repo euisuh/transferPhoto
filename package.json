@@ -1,0 +1,17 @@
+{
+  "name": "qr-photo-transfer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild web/app.js --bundle --minify --outfile=public/app.js",
+    "start": "npm run build && python3 serve.py",
+    "test": "node --test tests/*.test.js && python3 -m unittest discover -s tests -p 'test_*.py'"
+  },
+  "dependencies": {
+    "jsqr": "1.4.0",
+    "qrcode": "1.5.4"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}
