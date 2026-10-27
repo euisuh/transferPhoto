@@ -1,4 +1,4 @@
-> Retired project. Source retained for portfolio reference; no active deployment.
+> Retired project (archival). Source is retained for portfolio reference; no active deployment, no further development planned. CI runs the unit tests only.
 
 # QR Photo Transfer
 
@@ -29,7 +29,7 @@ Keep both screens awake. If decoding stalls, start with **Transfer settings → 
 
 For smaller files, use `--edge 1280 --quality 5`; visually check a sample before processing the entire folder. `--output "C:\QRTransfer"` selects a new output folder; existing folders are refused. Failures produce `errors.txt` and a nonzero exit status, while successfully compressed images remain available. Source: [`portable_sender.py.in`](portable_sender.py.in).
 
-**Verified here:** generated script copied alone to an isolated directory, executed with `python -I -S`, compressed images, preserved originals, produced valid ZIPs, extracted the byte-identical release sender, and preserved license notices. Browser smoke check displayed a QR stream from the extracted sender. **Not verified:** execution on Windows or a physical Android camera transfer. Evidence: [`tests/test_portable.py`](tests/test_portable.py), session observations recorded in [`HANDOFF-codex-2.md`](HANDOFF-codex-2.md).
+**Verified here:** generated script copied alone to an isolated directory, executed with `python -I -S`, compressed images, preserved originals, produced valid ZIPs, extracted the byte-identical release sender, and preserved license notices. Browser smoke check displayed a QR stream from the extracted sender. **Not verified:** execution on Windows or a physical Android camera transfer. Evidence: [`tests/test_portable.py`](tests/test_portable.py).
 
 Developer rebuild (not needed internally): `python3 tools/build_portable.py`. It reuses the shared compressor and the checksum-verified vendored release. [`vendor provenance`](vendor/decimen/README.md).
 
@@ -118,3 +118,7 @@ npm run build
 Tests exercise an actual FFmpeg JPEG encoded into rendered QR pixels, decoded by jsQR, then reconstructed byte for byte. They also cover missing frames, duplicate frames, ordering, checksum failure, unsafe metadata, compression size/dimension bounds, preservation of originals, existing-output refusal, and corrupt inputs. Sources: [`tests/protocol.test.js`](tests/protocol.test.js), [`tests/test_compress.py`](tests/test_compress.py).
 
 QR libraries: [node-qrcode](https://github.com/soldair/node-qrcode), [jsQR](https://github.com/cozmo/jsQR). Bundled locally; no CDN needed during transfer.
+
+## License
+
+Original code: MIT, see [LICENSE](LICENSE). `vendor/decimen/` is third-party and keeps its own license ([vendor/decimen/LICENSE](vendor/decimen/LICENSE)).
